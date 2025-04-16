@@ -1268,9 +1268,13 @@ class Agent(Generic[Context]):
 		try:
 			# First close browser resources
 			if self.browser_context and not self.injected_browser_context:
+				logger.info("Closing browser context...") # ADDED
 				await self.browser_context.close()
+				logger.info("Browser context closed.") # ADDED
 			if self.browser and not self.injected_browser:
-				await self.browser.close()
+				logger.info("Closing browser instance...") # ADDED
+				await self.browser.close() # This closes the browser instance
+				logger.info("Browser instance closed.") # ADDED
 
 			# Force garbage collection
 			gc.collect()

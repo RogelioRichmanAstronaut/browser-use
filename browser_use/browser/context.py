@@ -224,7 +224,7 @@ class BrowserSession:
 							if (!this.__listeners[type]) {
 								this.__listeners[type] = [];
 							}
-							
+
 
 							// Add the listener to __listeners
 							this.__listeners[type].push({
@@ -296,7 +296,7 @@ class BrowserContext:
 				return
 
 			# Then remove CDP protocol listeners
-			if self._page_event_handler and self.session.context:
+			if hasattr(self, '_page_event_handler') and self._page_event_handler and self.session.context:
 				try:
 					# This actually sends a CDP command to unsubscribe
 					self.session.context.remove_listener('page', self._page_event_handler)
@@ -308,9 +308,14 @@ class BrowserContext:
 
 			if self.config.trace_path:
 				try:
-					await self.session.context.tracing.stop(path=os.path.join(self.config.trace_path, f'{self.context_id}.zip'))
+					trace_file_path = os.path.join(self.config.trace_path, f'{self.context_id}.zip')
+					logger.info(f"Attempting to stop tracing and save to: {trace_file_path}")
+					await self.session.context.tracing.stop(path=trace_file_path)
+					logger.info(f"Successfully saved trace file: {trace_file_path}")
 				except Exception as e:
-					logger.debug(f'Failed to stop tracing: {e}')
+					# Log error at INFO level for visibility
+					logger.info(f'Failed to stop tracing or save file: {e}')
+
 
 			# This is crucial - it closes the CDP connection
 			if not self.config.keep_alive:
@@ -324,7 +329,9 @@ class BrowserContext:
 			# Dereference everything
 			self.active_tab = None
 			self.session = None
-			self._page_event_handler = None
+			if hasattr(self, '_page_event_handler'):
+				self._page_event_handler = None
+
 
 	def __del__(self):
 		"""Cleanup when object is destroyed"""
@@ -333,7 +340,12 @@ class BrowserContext:
 			try:
 				# Use sync Playwright method for force cleanup
 				if hasattr(self.session.context, '_impl_obj'):
-					asyncio.run(self.session.context._impl_obj.close())
+					# Avoid calling asyncio.run from a running loop
+					if asyncio.get_event_loop().is_running():
+						logger.warning("Cannot force close context from running event loop in __del__")
+					else:
+						asyncio.run(self.session.context._impl_obj.close())
+
 
 				self.session = None
 				gc.collect()
@@ -462,7 +474,9 @@ class BrowserContext:
 			)
 
 		if self.config.trace_path:
+			logger.info(f"Starting tracing for context {self.context_id}")
 			await context.tracing.start(screenshots=True, snapshots=True, sources=True)
+
 
 		# Load cookies if they exist
 		if self.config.cookies_file and os.path.exists(self.config.cookies_file):
