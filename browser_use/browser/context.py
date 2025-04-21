@@ -87,7 +87,7 @@ class BrowserContextConfig(BaseModel):
 	    wait_between_actions: 1.0
 	        Time to wait between multiple per step actions
 
-	    browser_window_size: {'width': 1280, 'height': 1100}
+	    browser_window_size: BrowserContextWindowSize(width=1280, height=1100)
 	        Default browser window size
 
 	    no_viewport: False
@@ -1212,6 +1212,9 @@ class BrowserContext:
 					css_selector += f'[{safe_attribute}]'
 				elif any(char in value for char in '"\'<>`\n\r\t'):
 					# Use contains for values with special characters
+					# For newline-containing text, only use the part before the newline
+					if '\n' in value:
+						value = value.split('\n')[0]
 					# Regex-substitute *any* whitespace with a single space, then strip.
 					collapsed_value = re.sub(r'\s+', ' ', value).strip()
 					# Escape embedded double-quotes.
